@@ -1,10 +1,23 @@
 #include <stdlib.h>
-#include <unistd.h>
+#ifndef _WIN32
+#	include <unistd.h>
+#	include <err.h>
+#else
+#	include <io.h>
+#endif
 #include <string.h>
-#include <err.h>
-#include <nfc/nfc.h>
 #include <nan.h>
+
+#include "nfc/nfc.h"
 #include "mifare.h"
+
+#include <thread>
+#include <chrono>
+
+#ifdef _WIN32
+#define bzero(b,len) (::memset((b), '\0', (len)), (void) 0)  
+#endif
+
 
 using namespace v8;
 
@@ -148,7 +161,7 @@ namespace {
         }
 
         void HandleErrorCallback() {
-            Local<Value> argv[2];
+            Local<Value> argv[1];
             argv[0] = Nan::New("error").ToLocalChecked();
             argv[1] = Nan::Error(AsyncProgressWorker::ErrorMessage());
 
@@ -168,7 +181,7 @@ namespace {
 
                 int timeout = 5 * 1000; //5 second timeout
                 while(baton->run && tag && --timeout > 0) {
-                    usleep(1000);
+                    std::this_thread::sleep_for(std::chrono::microseconds(1000));
                 }
                 if(timeout <= 0) {
                     //unresponsive VM, node was likely killed while this devide was not stopped.
@@ -218,7 +231,8 @@ namespace {
                     }
                     uint8_t abtRats[2] = { 0xe0, 0x50 };
                     uint8_t abtRx[MAX_FRAME_LENGTH];
-                    int res = nfc_initiator_transceive_bytes(baton->pnd, abtRats, sizeof abtRats, abtRx, sizeof abtRx, 0);
+                    auto rapdulen = sizeof abtRx;
+                    int res = nfc_initiator_transceive_bytes(baton->pnd, abtRats, sizeof abtRats, abtRx, &rapdulen, 0);
                     if (res > 0) {
                         int flip;
 
@@ -273,8 +287,9 @@ namespace {
                                        sizeof auth_params.abtAuthUid);
                                 memcpy(command + 2, &auth_params, sizeof auth_params);
 
+                                auto rapdulen = sizeof abtRx;
                                 res = nfc_initiator_transceive_bytes(baton->pnd, command, 2 + sizeof auth_params, abtRx,
-                                                                     sizeof abtRx, -1);
+                                                                     &rapdulen, -1);
                                 if (res >= 0) break;
                             }
                             if (key_index >= num_keys) {
@@ -286,7 +301,9 @@ namespace {
 
                         command[0] = MC_READ;
                         command[1] = cnt;
-                        res = nfc_initiator_transceive_bytes(baton->pnd, command, 2, dp, 16, -1);
+
+                        size_t rapdulen = 16;
+                        res = nfc_initiator_transceive_bytes(baton->pnd, command, 2, dp, &rapdulen, -1);
                         if (res >= 0) continue;
 
                         if (res != NFC_ERFTRANS) {
@@ -314,14 +331,14 @@ namespace {
                         break;
                     }
 
-                    int cnt, len, res;
+                    size_t cnt, len, res;
                     uint8_t command[2], data[16 * 12], *dp;
                     for (n = 0, cc = 0x0f, dp = data, cnt = sizeof data, len = 0;
                              n < cc;
                              n += 4, dp += res, cnt -= res, len += res) {
                         command[0] = MC_READ;
                         command[1] = n;
-                        res = nfc_initiator_transceive_bytes(baton->pnd, command, 2, dp, cnt, -1);
+                        res = nfc_initiator_transceive_bytes(baton->pnd, command, 2, dp, &cnt, -1);
                         if (res >= 0) continue;
 
                         if (res != NFC_ERFTRANS) {
@@ -384,7 +401,7 @@ namespace {
         Nan::HandleScope scope;
 
         nfc_context *context;
-        nfc_init(&context);
+        nfc_init(context);
         if (context == NULL) return Nan::ThrowError("unable to init libfnc (malloc).");
 
         nfc_device *pnd;
@@ -432,7 +449,7 @@ namespace {
         Nan::HandleScope scope;
 
         nfc_context *context;
-        nfc_init(&context);
+        nfc_init(context);
         if (context == NULL) return Nan::ThrowError("unable to init libfnc (malloc).");
 
         Local<Object> object = Nan::New<Object>();
@@ -446,10 +463,9 @@ namespace {
 
             entry->Set(Nan::New("name").ToLocalChecked(), Nan::New(nfc_device_get_name(pnd)).ToLocalChecked());
 
-            char *info;
-            if (nfc_device_get_information_about(pnd, &info) >= 0) {
+            const char *info = nfc_device_get_name(pnd);
+            if (info >= 0) {
                 entry->Set(Nan::New("info").ToLocalChecked(), Nan::New(info).ToLocalChecked());
-                nfc_free(info);
             } else {
                 entry->Set(Nan::New("info").ToLocalChecked(), Nan::New("").ToLocalChecked());
             }
@@ -467,7 +483,7 @@ namespace {
         Nan::HandleScope       scope;
 
         nfc_context *context;
-        nfc_init(&context);
+        nfc_init(context);
         if (context == NULL) return Nan::ThrowError("unable to init libnfc (malloc).");
 
         Local<Object> object = Nan::New<Object>();
