@@ -14,7 +14,8 @@
         "../bin/win/x86/libnfc.lib"
       ],
       "include_dirs": [
-        "<!(node -e \"require('nan')\")"
+        "<!(node -e \"require('nan')\")",
+		"include"
       ],
       "conditions": [
         [
