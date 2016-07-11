@@ -38,11 +38,63 @@ static uint8_t keys[] = {
 };
 static size_t num_keys = sizeof(keys) / 6;
 
+#include <memory>
 
 namespace {
 
+    class NFCAutoInitializer
+    {
+    public:
+        using Handle = std::shared_ptr<NFCAutoInitializer>;
+
+        NFCAutoInitializer()
+            : mInitialized(false)
+            , mContext(nullptr)
+        {
+            nfc_context *ctx = nullptr;
+            nfc_init(ctx);
+
+            mInitialized = (ctx != nullptr);
+            mContext = ctx;
+        };
+
+        ~NFCAutoInitializer()
+        {
+            if (!mInitialized)
+                return;
+
+            nfc_exit(mContext);
+            mContext = nullptr;
+            mInitialized = false;
+        };
+
+        bool isInitialized()
+        {
+            return mInitialized;
+        }
+
+        nfc_context* getContext()
+        {
+            return mContext;
+        }
+
+        static Handle GetHandle()
+        {
+            static Handle handle{ new NFCAutoInitializer };
+            return handle;
+        }
+
+    private:
+        bool mInitialized;
+        nfc_context* mContext;
+    };
+
     class NFC: public Nan::ObjectWrap {
       public:
+          NFC()
+              : Nan::ObjectWrap()
+              , handle(NFCAutoInitializer::GetHandle()) {}
+
         static NAN_METHOD(New);
         static NAN_METHOD(Start);
         static NAN_METHOD(Stop);
@@ -55,15 +107,11 @@ namespace {
                 nfc_close(pnd);
                 pnd = NULL;
             }
-            if(context) {
-                nfc_exit(context);
-                context = NULL;
-            }
         }
 
+        NFCAutoInitializer::Handle handle;
         nfc_device *pnd;
         nfc_target nt;
-        nfc_context *context;
         bool run;
         bool claimed;
     };
@@ -337,7 +385,7 @@ namespace {
                              n < cc;
                              n += 4, dp += res, cnt -= res, len += res) {
                         command[0] = MC_READ;
-                        command[1] = n;
+                        command[1] = static_cast<uint8_t>(n);
                         res = nfc_initiator_transceive_bytes(baton->pnd, command, 2, dp, &cnt, -1);
                         if (res >= 0) continue;
 
@@ -400,14 +448,15 @@ namespace {
     NAN_METHOD(NFC::Start) {
         Nan::HandleScope scope;
 
-        nfc_context *context;
-        nfc_init(context);
-        if (context == NULL) return Nan::ThrowError("unable to init libfnc (malloc).");
+        NFC* nfc = ObjectWrap::Unwrap<NFC>(info.This());
+        if (!nfc->handle->isInitialized())
+            return Nan::ThrowError("unable to init libfnc (malloc).");
+
+        auto context = nfc->handle->getContext();
 
         nfc_device *pnd;
         if (info.Length() > 0) {
             if (!info[0]->IsString()) {
-                nfc_exit(context);
                 return Nan::ThrowError("deviceID parameter is not a string");
             }
             nfc_connstring connstring;
@@ -419,7 +468,6 @@ namespace {
             pnd = nfc_open(context, NULL);
         }
         if (pnd == NULL) {
-            nfc_exit(context);
             return Nan::ThrowError("unable open NFC device");
         }
 
@@ -427,12 +475,11 @@ namespace {
         if (nfc_initiator_init(pnd) < 0) {
             snprintf(result, sizeof result, "nfc_initiator_init: %s", nfc_strerror(pnd));
             nfc_close(pnd);
-            nfc_exit(context);
             return Nan::ThrowError(result);
         }
 
         NFC *baton = ObjectWrap::Unwrap<NFC>(info.This());
-        baton->context = context;
+        //baton->context = context; //???
         baton->pnd = pnd;
 
         NFCReadWorker* readWorker = new NFCReadWorker(baton, info.This());
@@ -448,9 +495,12 @@ namespace {
     NAN_METHOD(Scan) {
         Nan::HandleScope scope;
 
-        nfc_context *context;
-        nfc_init(context);
-        if (context == NULL) return Nan::ThrowError("unable to init libfnc (malloc).");
+        auto handle = NFCAutoInitializer::GetHandle();
+
+        if (!handle->isInitialized())
+            return Nan::ThrowError("unable to init libfnc (malloc).");
+
+        auto context = handle->getContext();
 
         Local<Object> object = Nan::New<Object>();
 
@@ -474,23 +524,22 @@ namespace {
             nfc_close(pnd);
         }
 
-        nfc_exit(context);
-
         info.GetReturnValue().Set(object);
     }
 
     NAN_METHOD(Version) {
         Nan::HandleScope       scope;
 
-        nfc_context *context;
-        nfc_init(context);
-        if (context == NULL) return Nan::ThrowError("unable to init libnfc (malloc).");
+        auto handle = NFCAutoInitializer::GetHandle();
+
+        if (!handle->isInitialized())
+            return Nan::ThrowError("unable to init libfnc (malloc).");
+
+        auto context = handle->getContext();
 
         Local<Object> object = Nan::New<Object>();
         object->Set(Nan::New("name").ToLocalChecked(), Nan::New("libnfc").ToLocalChecked());
         object->Set(Nan::New("version").ToLocalChecked(), Nan::New(nfc_version()).ToLocalChecked());
-
-        nfc_exit(context);
 
         info.GetReturnValue().Set(object);
     }
