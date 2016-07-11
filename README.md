@@ -22,6 +22,10 @@ On MacOS X, you want:
     brew doctor
     brew install libusb-compat libnfc
 
+On Windows:
+
+    32bit (x86) node only
+
 ### Step 2: Installation
 
 To install it, use npm:

@@ -12,6 +12,7 @@ pids
 logs
 results
 
+.idea
 build/
 node_modules/
-npm-debug.log
+npm-debug.log*
