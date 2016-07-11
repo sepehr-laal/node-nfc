@@ -7,6 +7,9 @@
 
 #include <thread>
 #include <chrono>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
 
 namespace
 {
@@ -14,7 +17,7 @@ static const nfc_modulation nmMifare = {
     NMT_ISO14443A,
     NBR_106,
 };
-static uint8_t keys[] = {
+static const uint8_t keys[] = {
     0xff, 0xff, 0xff, 0xff, 0xff, 0xff,
     0xd3, 0xf7, 0xd3, 0xf7, 0xd3, 0xf7,
     0xa0, 0xa1, 0xa2, 0xa3, 0xa4, 0xa5,
@@ -25,7 +28,7 @@ static uint8_t keys[] = {
     0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
     0xab, 0xcd, 0xef, 0x12, 0x34, 0x56
 };
-static size_t num_keys = sizeof(keys) / 6;
+static const size_t num_keys = sizeof(keys) / 6;
 
 static void zero_mem(void* memory, size_t len) {
     ::memset(memory, '\0', len);

@@ -4,6 +4,8 @@
 
 #include <nfc/nfc.h>
 
+#include <cstdio>
+
 namespace nodenfc
 {
 
@@ -77,7 +79,6 @@ NAN_METHOD(NFCWrapper::Start) {
     }
 
     NFCWrapper *baton = ObjectWrap::Unwrap<NFCWrapper>(info.This());
-    //baton->context = context; //???
     baton->pnd = pnd;
 
     NFCReadWorker* readWorker = new NFCReadWorker(baton, info.This());

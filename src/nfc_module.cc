@@ -1,19 +1,11 @@
-#include <stdlib.h>
-#ifndef _WIN32
-#	include <unistd.h>
-#	include <err.h>
-#else
-#	include <io.h>
-#endif
-#include <string.h>
 #include <nan.h>
 
 #include "nfc/nfc.h"
 #include "nfc_wrapper.hh"
 
-using namespace v8;
-
 namespace nodenfc {
+
+using namespace v8;
 
 NAN_METHOD(Scan)
 {
