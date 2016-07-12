@@ -12,14 +12,11 @@ public:
     using Handle = std::shared_ptr<NFCAutoInitializer>;
     ~NFCAutoInitializer();
 
-    bool            isInitialized();
-    nfc_context*    getContext();
     static Handle   GetHandle();
+    static void     Shutdown();
 
 private:
     NFCAutoInitializer();
-    bool            mInitialized;
-    nfc_context*    mContext;
 };
 
 }

@@ -48,10 +48,7 @@ NAN_METHOD(NFCWrapper::Start) {
     Nan::HandleScope scope;
 
     NFCWrapper* nfc = ObjectWrap::Unwrap<NFCWrapper>(info.This());
-    if (!nfc->handle->isInitialized())
-        return Nan::ThrowError("unable to init libfnc (malloc).");
-
-    auto context = nfc->handle->getContext();
+    auto context = nullptr;
 
     nfc_device *pnd;
     if (info.Length() > 0) {
