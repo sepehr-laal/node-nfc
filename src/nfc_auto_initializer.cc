@@ -5,40 +5,31 @@ namespace nodenfc
 {
 
 NFCAutoInitializer::NFCAutoInitializer()
-    : mInitialized(false)
-    , mContext(nullptr)
 {
     nfc_context *ctx = nullptr;
-    nfc_init(ctx);
-
-    mInitialized = (ctx != nullptr);
-    mContext = ctx;
+    nfc_init(nullptr);
 }
 
 NFCAutoInitializer::~NFCAutoInitializer()
 {
-    if (!mInitialized)
-        return;
-
-    nfc_exit(mContext);
-    mContext = nullptr;
-    mInitialized = false;
-}
-
-bool NFCAutoInitializer::isInitialized()
-{
-    return mInitialized;
-}
-
-nfc_context* NFCAutoInitializer::getContext()
-{
-    return mContext;
+    Shutdown();
 }
 
 NFCAutoInitializer::Handle NFCAutoInitializer::GetHandle()
 {
     static Handle handle{ new NFCAutoInitializer };
     return handle;
+}
+
+void NFCAutoInitializer::Shutdown()
+{
+    static bool isShutdown = false;
+
+    if (!isShutdown)
+    {
+        nfc_exit(nullptr);
+        isShutdown = true;
+    }
 }
 
 }
